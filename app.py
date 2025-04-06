@@ -1,61 +1,121 @@
-from flask import Flask, request, render_template, render_template_string
-import tensorflow as tf
-import numpy as np
-from PIL import Image
+# app.py
 import os
-
-from utils import apply_cityscapes_palette
+import io
+from flask import Flask, request, send_file, render_template_string
+from PIL import Image
+import numpy as np
+import tensorflow as tf
 
 app = Flask(__name__)
 
-# Charger le modèle .tflite
-interpreter = tf.lite.Interpreter(model_path="model/model.tflite")
+# Load TFLite model
+TFLITE_MODEL_PATH = "models/model.tflite"
+interpreter = tf.lite.Interpreter("model/model.tflite")
 interpreter.allocate_tensors()
-
-# Obtenir les détails du modèle
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
+# Cityscapes palette
+CITYSCAPES_PALETTE = [
+    (128, 64, 128), (244, 35, 232), (70, 70, 70), (102, 102, 156),
+    (190, 153, 153), (153, 153, 153), (250, 170, 30), (220, 220, 0),
+    (107, 142, 35), (152, 251, 152), (70, 130, 180), (220, 20, 60),
+    (255, 0, 0), (0, 0, 142), (0, 0, 70), (0, 60, 100),
+    (0, 80, 100), (0, 0, 230), (119, 11, 32)
+]
+
+def predict_mask_tflite(image, input_size=(128, 256)):
+    image = image.resize(input_size[::-1])
+    img_array = np.array(image, dtype=np.float32) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+    interpreter.set_tensor(input_details[0]['index'], img_array)
+    interpreter.invoke()
+    output = interpreter.get_tensor(output_details[0]['index'])
+    mask = np.argmax(output[0], axis=-1).astype(np.uint8)
+
+    color_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+    for i, color in enumerate(CITYSCAPES_PALETTE):
+        color_mask[mask == i] = color
+    return Image.fromarray(color_mask)
+
 @app.route("/")
-def index():
-    return render_template("index.html")
+def home():
+    return "✅ Cityscapes API Flask fonctionne sur Render"
+
+@app.route("/form", methods=["GET"])
+def form():
+    return '''
+    <html><body>
+    <h2>Uploader une image Cityscapes (.png)</h2>
+    <form action="/dashboard" method="post" enctype="multipart/form-data">
+        <input type="file" name="image" accept="image/png">
+        <input type="submit" value="Prédire le masque">
+    </form>
+    </body></html>
+    '''
+
+@app.route("/dashboard", methods=["POST"])
+def dashboard():
+    if 'image' not in request.files:
+        return "Aucune image envoyée", 400
+
+    image_file = request.files['image']
+    original = Image.open(image_file).convert("RGB")
+    mask = predict_mask_tflite(original)
+
+    original_io = io.BytesIO()
+    mask_io = io.BytesIO()
+    original.save(original_io, format='PNG')
+    mask.save(mask_io, format='PNG')
+    original_io.seek(0)
+    mask_io.seek(0)
+
+    html = f'''
+    <html>
+    <head>
+        <title>Dashboard Prédiction</title>
+        <style>
+            img {{ max-width: 45%; height: auto; margin: 10px; }}
+            .container {{ display: flex; flex-direction: row; justify-content: center; align-items: center; }}
+        </style>
+    </head>
+    <body>
+        <h2 style="text-align:center;">Résultat de la segmentation</h2>
+        <div class="container">
+            <div>
+                <h4>Image originale</h4>
+                <img src="data:image/png;base64,{base64_img(original_io)}">
+            </div>
+            <div>
+                <h4>Masque prédit</h4>
+                <img src="data:image/png;base64,{base64_img(mask_io)}">
+            </div>
+        </div>
+        <div style="text-align:center;">
+            <a href="/form">↩ Retour</a>
+        </div>
+    </body>
+    </html>
+    '''
+    return render_template_string(html)
+
+def base64_img(io_buffer):
+    import base64
+    return base64.b64encode(io_buffer.read()).decode('utf-8')
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    file = request.files["file"]
+    if 'image' not in request.files:
+        return "❌ Aucun fichier image reçu", 400
+    image_file = request.files['image']
+    image = Image.open(image_file).convert("RGB")
+    mask_image = predict_mask_tflite(image)
 
-    # Lire dynamiquement la taille attendue
-    input_shape = input_details[0]['shape']  # (1, height, width, 3)
-    height, width = input_shape[1], input_shape[2]
+    buffer = io.BytesIO()
+    mask_image.save(buffer, format="PNG")
+    buffer.seek(0)
+    return send_file(buffer, mimetype="image/png")
 
-    # Ouvrir et redimensionner l'image
-    image = Image.open(file.stream).convert("RGB")
-    image = image.resize((width, height))
-    img_array = np.array(image, dtype=np.float32) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-
-    # Inference TFLite
-    interpreter.set_tensor(input_details[0]['index'], img_array)
-    interpreter.invoke()
-    output_data = interpreter.get_tensor(output_details[0]['index'])
-
-    # Masque prédit (argmax)
-    pred_mask = np.argmax(output_data[0], axis=-1).astype(np.uint8)
-
-    # Appliquer la palette colorée
-    mask_img = apply_cityscapes_palette(pred_mask)
-
-    # Sauvegarder le masque colorisé
-    os.makedirs("static/outputs", exist_ok=True)
-    mask_path = "static/outputs/mask.png"
-    mask_img.save(mask_path)
-
-    return render_template_string(f"""
-        <h2>Masque généré</h2>
-        <img src='/{mask_path}' width=512><br><br>
-        <a href='/'>Retour</a>
-    """)
-
-# Lancer l'API Flask
-if __name__ == "__main__":
-    app.run(debug=True)
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
