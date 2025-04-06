@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 # Load TFLite model
 TFLITE_MODEL_PATH = "models/model.tflite"
-interpreter = tf.lite.Interpreter("model/model.tflite")
+interpreter = tf.lite.Interpreter(model_path=TFLITE_MODEL_PATH)
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
@@ -23,7 +23,7 @@ CITYSCAPES_PALETTE = [
     (255, 0, 0), (0, 0, 142), (0, 0, 70), (0, 60, 100),
     (0, 80, 100), (0, 0, 230), (119, 11, 32)
 ]
-
+ 
 def predict_mask_tflite(image, input_size=(128, 256)):
     image = image.resize(input_size[::-1])
     img_array = np.array(image, dtype=np.float32) / 255.0
@@ -59,9 +59,15 @@ def dashboard():
     if 'image' not in request.files:
         return "Aucune image envoyée", 400
 
+    import time
+    start_time = time.time()
+
     image_file = request.files['image']
     original = Image.open(image_file).convert("RGB")
     mask = predict_mask_tflite(original)
+    mask = mask.resize(original.size)
+
+    elapsed_time = round(time.time() - start_time, 2)
 
     original_io = io.BytesIO()
     mask_io = io.BytesIO()
@@ -81,6 +87,7 @@ def dashboard():
     </head>
     <body>
         <h2 style="text-align:center;">Résultat de la segmentation</h2>
+        <p style="text-align:center;">⏱️ Temps de prédiction : {elapsed_time} secondes</p>
         <div class="container">
             <div>
                 <h4>Image originale</h4>
@@ -92,7 +99,8 @@ def dashboard():
             </div>
         </div>
         <div style="text-align:center;">
-            <a href="/form">↩ Retour</a>
+            <a href="/form">↩ Retour</a><br>
+            <a href="/predict" download="mask.png">📥 Télécharger le masque</a>
         </div>
     </body>
     </html>
@@ -110,11 +118,25 @@ def predict():
     image_file = request.files['image']
     image = Image.open(image_file).convert("RGB")
     mask_image = predict_mask_tflite(image)
+    mask_image = mask_image.resize(image.size)
+
+    # Sauvegarder temporairement le masque sur disque
+    output_path = "static/latest_mask.png"
+    os.makedirs("static", exist_ok=True)
+    mask_image.save(output_path)
 
     buffer = io.BytesIO()
     mask_image.save(buffer, format="PNG")
     buffer.seek(0)
     return send_file(buffer, mimetype="image/png")
+
+@app.route("/download_mask")
+def download_mask():
+    mask_path = "static/latest_mask.png"
+    if os.path.exists(mask_path):
+        return send_file(mask_path, as_attachment=True)
+    else:
+        return "❌ Aucun masque disponible pour le téléchargement.", 404
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
