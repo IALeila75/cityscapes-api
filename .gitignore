@@ -1,0 +1,20 @@
+# Environnement virtuel
+venv/
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# Fichiers générés
+static/outputs/
+
+# Images de test
+*.jpg
+*.png
+model/*.keras
+
+# Modèles de machine learning
+model/*.h5
+model/*.keras
+*.tflite
+*.onnx
