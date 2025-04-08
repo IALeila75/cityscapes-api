@@ -9,7 +9,7 @@ import tensorflow as tf
 app = Flask(__name__)
 
 # Load TFLite model
-TFLITE_MODEL_PATH = "model/model.tflite"
+TFLITE_MODEL_PATH = "models/model.tflite"
 interpreter = tf.lite.Interpreter(model_path=TFLITE_MODEL_PATH)
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
@@ -44,34 +44,62 @@ def home():
 
 @app.route("/form", methods=["GET"])
 def form():
-    return '''
+    # Lister les images de test depuis un dossier local (ex: static/test_images)
+    test_dir = "static/test_images"
+    os.makedirs(test_dir, exist_ok=True)
+    image_files = [f for f in os.listdir(test_dir) if f.endswith(".png") or f.endswith(".jpg")]
+
+    # Générer les options HTML pour les images test
+    image_options = "".join([f'<option value="{f}">{f}</option>' for f in image_files])
+
+    return f'''
     <html><body>
     <h2>Uploader une image Cityscapes (.png)</h2>
     <form action="/dashboard" method="post" enctype="multipart/form-data">
         <input type="file" name="image" accept="image/png">
         <input type="submit" value="Prédire le masque">
     </form>
+
+    <hr>
+    <h2>Ou choisir une image de test</h2>
+    <form action="/dashboard" method="post">
+        <select name="test_image">
+            {image_options}
+        </select>
+        <input type="submit" value="Utiliser l'image de test">
+    </form>
     </body></html>
     '''
 
 @app.route("/dashboard", methods=["POST"])
 def dashboard():
-    if 'image' not in request.files:
-        return "Aucune image envoyée", 400
-
     import time
     start_time = time.time()
 
-    image_file = request.files['image']
-    original = Image.open(image_file).convert("RGB")
-    mask = predict_mask_tflite(original)
-    mask = mask.resize(original.size)
+    image = None
+
+    if 'image' in request.files and request.files['image'].filename != '':
+        image_file = request.files['image']
+        image_file.stream.seek(0)
+        image = Image.open(image_file).convert("RGB")
+    elif 'test_image' in request.form:
+        filename = request.form['test_image']
+        image_path = os.path.join("static/test_images", filename)
+        if os.path.exists(image_path):
+            image = Image.open(image_path).convert("RGB")
+        else:
+            return "❌ Image de test non trouvée.", 404
+    else:
+        return "❌ Aucune image fournie.", 400
+
+    mask = predict_mask_tflite(image)
+    mask = mask.resize(image.size)
 
     elapsed_time = round(time.time() - start_time, 2)
 
     original_io = io.BytesIO()
     mask_io = io.BytesIO()
-    original.save(original_io, format='PNG')
+    image.save(original_io, format='PNG')
     mask.save(mask_io, format='PNG')
     original_io.seek(0)
     mask_io.seek(0)
@@ -100,7 +128,7 @@ def dashboard():
         </div>
         <div style="text-align:center;">
             <a href="/form">↩ Retour</a><br>
-            <a href="/predict" download="mask.png">📥 Télécharger le masque</a>
+            <a href="/download_mask">📥 Télécharger le masque</a>
         </div>
     </body>
     </html>
