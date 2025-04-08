@@ -9,7 +9,7 @@ import tensorflow as tf
 app = Flask(__name__)
 
 # Load TFLite model
-TFLITE_MODEL_PATH = "models/model.tflite"
+TFLITE_MODEL_PATH = "model/model.tflite"
 interpreter = tf.lite.Interpreter(model_path=TFLITE_MODEL_PATH)
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
@@ -81,28 +81,46 @@ def dashboard():
     if 'image' in request.files and request.files['image'].filename != '':
         image_file = request.files['image']
         image_file.stream.seek(0)
+        print(f"→ Image uploadée : {image_file.filename}")
         image = Image.open(image_file).convert("RGB")
     elif 'test_image' in request.form:
         filename = request.form['test_image']
         image_path = os.path.join("static/test_images", filename)
         if os.path.exists(image_path):
+            print(f"→ Image de test chargée : {image_path}")
             image = Image.open(image_path).convert("RGB")
         else:
             return "❌ Image de test non trouvée.", 404
     else:
         return "❌ Aucune image fournie.", 400
 
+    print(f"→ Taille image avant prédiction : {image.size}")
     mask = predict_mask_tflite(image)
     mask = mask.resize(image.size)
+    os.makedirs("static", exist_ok=True)
+    mask.save("static/latest_mask.png")
+    # Créer une superposition (alpha-blend)
+    overlay = Image.blend(image, mask, alpha=0.5)
 
     elapsed_time = round(time.time() - start_time, 2)
 
     original_io = io.BytesIO()
     mask_io = io.BytesIO()
+    overlay_io = io.BytesIO()
+
     image.save(original_io, format='PNG')
     mask.save(mask_io, format='PNG')
+    overlay.save(overlay_io, format='PNG')
+
     original_io.seek(0)
     mask_io.seek(0)
+    overlay_io.seek(0)
+
+    # Convertir tout en base64 une seule fois
+    original_b64 = base64_img(original_io)
+    mask_b64 = base64_img(mask_io)
+    overlay_b64 = base64_img(overlay_io)
+
 
     html = f'''
     <html>
@@ -119,12 +137,18 @@ def dashboard():
         <div class="container">
             <div>
                 <h4>Image originale</h4>
-                <img src="data:image/png;base64,{base64_img(original_io)}">
+                <img src="data:image/png;base64,{original_b64}">
             </div>
             <div>
                 <h4>Masque prédit</h4>
-                <img src="data:image/png;base64,{base64_img(mask_io)}">
+                <img src="data:image/png;base64,{mask_b64}">
             </div>
+            <div>
+                <h4>Superposition</h4>
+                <img src="data:image/png;base64,{overlay_b64}">
+            </div>
+        </div>
+            
         </div>
         <div style="text-align:center;">
             <a href="/form">↩ Retour</a><br>
