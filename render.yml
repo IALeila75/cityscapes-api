@@ -3,6 +3,6 @@ services:
     name: cityscapes-api
     env: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn api:app"
+    startCommand: "gunicorn app :app"
     plan: free
     autoDeploy: true

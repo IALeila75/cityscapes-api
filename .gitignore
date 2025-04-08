@@ -18,3 +18,9 @@ model/*.h5
 model/*.keras
 *.tflite
 *.onnx
+
+# Ne pas ignorer model.tflite
+!models/model.tflite
+
+# Ignorer les autres .tflite par défaut
+*.tflite
