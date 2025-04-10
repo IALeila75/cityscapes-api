@@ -45,14 +45,61 @@ def home():
 @app.route("/form", methods=["GET"])
 def form():
     return '''
-    <html><body>
-    <h2>Uploader une image Cityscapes (.png)</h2>
-    <form action="/dashboard" method="post" enctype="multipart/form-data">
-        <input type="file" name="image" accept="image/png">
-        <input type="submit" value="Prédire le masque">
-    </form>
-    </body></html>
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <title>Cityscapes Segmentation</title>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+        <style>
+            body {
+                font-family: 'Roboto', sans-serif;
+                background-color: #f4f4f4;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+            }
+            h2 {
+                color: #333;
+                margin-bottom: 20px;
+            }
+            form {
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            }
+            input[type="file"] {
+                margin-bottom: 20px;
+                font-size: 16px;
+            }
+            input[type="submit"] {
+                padding: 10px 20px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                font-size: 16px;
+                cursor: pointer;
+            }
+            input[type="submit"]:hover {
+                background-color: #45a049;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Uploader une image Cityscapes (.png)</h2>
+        <form action="/dashboard" method="post" enctype="multipart/form-data">
+            <input type="file" name="image" accept="image/png" required><br>
+            <input type="submit" value="Prédire le masque">
+        </form>
+    </body>
+    </html>
     '''
+
 
 @app.route("/dashboard", methods=["POST"])
 def dashboard():
