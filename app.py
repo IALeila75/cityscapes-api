@@ -44,13 +44,13 @@ def home():
 
 @app.route("/form", methods=["GET"])
 def form():
-    # Lister les images de test depuis un dossier local (ex: static/test_images)
-    test_dir = "static/test_images"
-    os.makedirs(test_dir, exist_ok=True)
-    image_files = [f for f in os.listdir(test_dir) if f.endswith(".png") or f.endswith(".jpg")]
+  #  # Lister les images de test depuis un dossier local (ex: static/test_images)
+  #  test_dir = "static/test_images"
+  #  os.makedirs(test_dir, exist_ok=True)
+  #  image_files = [f for f in os.listdir(test_dir) if f.endswith(".png") or f.endswith(".jpg")]
 
     # Générer les options HTML pour les images test
-    image_options = "".join([f'<option value="{f}">{f}</option>' for f in image_files])
+   # image_options = "".join([f'<option value="{f}">{f}</option>' for f in image_files])
 
     return f'''
     <html><body>
@@ -60,14 +60,7 @@ def form():
         <input type="submit" value="Prédire le masque">
     </form>
 
-    <hr>
-    <h2>Ou choisir une image de test</h2>
-    <form action="/dashboard" method="post">
-        <select name="test_image">
-            {image_options}
-        </select>
-        <input type="submit" value="Utiliser l'image de test">
-    </form>
+    
     </body></html>
     '''
 
