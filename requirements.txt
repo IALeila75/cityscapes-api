@@ -1,15 +1,5 @@
-# Re-création après reset du kernel
-requirements = """
 Flask==2.3.2
 tensorflow==2.14.0
 numpy==1.24.3
 Pillow==9.5.0
 gunicorn==21.2.0
-"""
-
-# Sauvegarde du fichier requirements.txt
-path = "/mnt/data/requirements.txt"
-with open(path, "w") as f:
-    f.write(requirements.strip())
-
-path
