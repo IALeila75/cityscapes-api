@@ -28,9 +28,17 @@ def predict_mask_tflite(image, input_size=(128, 256)):
     image = image.resize(input_size[::-1])
     img_array = np.array(image, dtype=np.float32) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
-    interpreter.set_tensor(input_details[0]['index'], img_array)
+    '''interpreter.set_tensor(input_details[0]['index'], img_array)
     interpreter.invoke()
-    output = interpreter.get_tensor(output_details[0]['index'])
+    output = interpreter.get_tensor(output_details[0]['index'])'''
+    try:
+       interpreter.set_tensor(input_details[0]['index'], img_array)
+       interpreter.invoke()
+       output = interpreter.get_tensor(output_details[0]['index'])
+    except Exception as e:
+       print("❌ Erreur pendant l'inférence TFLite :", e)
+       raise e
+
     mask = np.argmax(output[0], axis=-1).astype(np.uint8)
 
     color_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
