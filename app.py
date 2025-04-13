@@ -113,15 +113,26 @@ def dashboard():
     original = Image.open(image_file).convert("RGB")
     mask = predict_mask_tflite(original)
     mask = mask.resize(original.size)
+    
+    # Créer la superposition
+    overlay = Image.blend(original.convert("RGBA"), mask.convert("RGBA"), alpha=0.5)
+    overlay_path = "static/latest_overlay.png"
+    os.makedirs("static", exist_ok=True)
+    overlay.save(overlay_path)
 
     elapsed_time = round(time.time() - start_time, 2)
 
     original_io = io.BytesIO()
     mask_io = io.BytesIO()
+    overlay_io = io.BytesIO()
+
     original.save(original_io, format='PNG')
     mask.save(mask_io, format='PNG')
+    overlay.save(overlay_io, format='PNG')
+
     original_io.seek(0)
     mask_io.seek(0)
+    overlay_io.seek(0)
 
     html = f'''
     <html>
@@ -129,30 +140,36 @@ def dashboard():
         <title>Dashboard Prédiction</title>
         <style>
             img {{ max-width: 45%; height: auto; margin: 10px; }}
-            .container {{ display: flex; flex-direction: row; justify-content: center; align-items: center; }}
+            .container {{ display: flex; flex-direction: row; justify-content: center; align-items: center; flex-wrap: wrap; }}
         </style>
-    </head>
-    <body>
-        <h2 style="text-align:center;">Résultat de la segmentation</h2>
-        <p style="text-align:center;">⏱️ Temps de prédiction : {elapsed_time} secondes</p>
-        <div class="container">
-            <div>
-                <h4>Image originale</h4>
-                <img src="data:image/png;base64,{base64_img(original_io)}">
-            </div>
-            <div>
-                <h4>Masque prédit</h4>
-                <img src="data:image/png;base64,{base64_img(mask_io)}">
-            </div>
-        </div>
-        <div style="text-align:center;">
-            <a href="/form">↩ Retour</a><br>
-            <a href="/predict" download="mask.png">📥 Télécharger le masque</a>
-        </div>
-    </body>
-    </html>
-    '''
+      </head>
+      <body>
+          <h2 style="text-align:center;">Résultat de la segmentation</h2>
+          <p style="text-align:center;">⏱️ Temps de prédiction : {elapsed_time} secondes</p>
+          <div class="container">
+              <div>
+                  <h4>Image originale</h4>
+                  <img src="data:image/png;base64,{base64_img(original_io)}">
+              </div>
+              <div>
+                  <h4>Masque prédit</h4>
+                  <img src="data:image/png;base64,{base64_img(mask_io)}">
+              </div>
+              <div>
+                  <h4>Superposition</h4>
+                  <img src="data:image/png;base64,{base64_img(overlay_io)}">
+              </div>
+           </div>
+           <div style="text-align:center;">
+               <a href="/form">↩ Retour</a><br>
+               <a href="/download_mask"><button>📥 Télécharger le masque</button></a><br>
+               <a href="/download_overlay"><button>📥 Télécharger la superposition</button></a>
+           </div>
+      </body>
+      </html>
+      '''
     return render_template_string(html)
+    
 
 def base64_img(io_buffer):
     import base64
