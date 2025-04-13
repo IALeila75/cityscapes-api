@@ -5,6 +5,7 @@ from flask import Flask, request, send_file, render_template_string
 from PIL import Image
 import numpy as np
 import tensorflow as tf
+import base64
 
 app = Flask(__name__)
 
@@ -128,6 +129,7 @@ def dashboard():
 
     original.save(original_io, format='PNG')
     mask.save(mask_io, format='PNG')
+    os.makedirs("static", exist_ok=True)
     overlay.save(overlay_io, format='PNG')
 
     original_io.seek(0)
