@@ -10,10 +10,10 @@ app = Flask(__name__)
 
 # Load TFLite model
 TFLITE_MODEL_PATH = "model/model.tflite"
-interpreter = tf.lite.Interpreter(model_path=TFLITE_MODEL_PATH)
-interpreter.allocate_tensors()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+#interpreter = tf.lite.Interpreter(model_path=TFLITE_MODEL_PATH)
+#interpreter.allocate_tensors()
+#input_details = interpreter.get_input_details()
+#output_details = interpreter.get_output_details()
 
 # Cityscapes palette
 CITYSCAPES_PALETTE = [
@@ -26,25 +26,8 @@ CITYSCAPES_PALETTE = [
  
 def predict_mask_tflite(image, input_size=(128, 256)):
     image = image.resize(input_size[::-1])
-    img_array = np.array(image, dtype=np.float32) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-    '''interpreter.set_tensor(input_details[0]['index'], img_array)
-    interpreter.invoke()
-    output = interpreter.get_tensor(output_details[0]['index'])'''
-    try:
-       interpreter.set_tensor(input_details[0]['index'], img_array)
-       interpreter.invoke()
-       output = interpreter.get_tensor(output_details[0]['index'])
-    except Exception as e:
-       print("❌ Erreur pendant l'inférence TFLite :", e)
-       raise e
-
-    mask = np.argmax(output[0], axis=-1).astype(np.uint8)
-
-    color_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
-    for i, color in enumerate(CITYSCAPES_PALETTE):
-        color_mask[mask == i] = color
-    return Image.fromarray(color_mask)
+    dummy = Image.new("RGB", image.size, color=(128, 64, 128))
+    return dummy
 
 @app.route("/")
 def home():
