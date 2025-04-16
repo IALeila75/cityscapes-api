@@ -35,7 +35,7 @@ def predict():
         image_array = np.array(image) / 255.0
         image_array = np.expand_dims(image_array, axis=0)
 
-        # Prédiction
+        '''# Prédiction
         #pred = model.predict(image_array)
         #mask = np.argmax(pred[0], axis=-1).astype(np.uint8)
         
@@ -49,7 +49,18 @@ def predict():
         mask_img = Image.fromarray(mask * (255 // 18))  # simple grayscale scaling
         mask_id = str(uuid.uuid4())
         output_path = f"static/outputs/mask_{mask_id}.png"
-        mask_img.save(output_path)
+        mask_img.save(output_path)'''
+        # Prédiction avec le modèle
+        output_data = model.predict(image_array)
+        pred_mask = np.argmax(output_data[0], axis=-1).astype(np.uint8)
+
+        from utils import apply_cityscapes_palette
+        mask = apply_cityscapes_palette(pred_mask)
+
+        # Enregistrer le masque colorisé
+        mask_id = str(uuid.uuid4())
+        output_path = f"static/outputs/mask_{mask_id}.png"
+        mask.save(output_path)
 
         return render_template_string(f"""
         <h2>Masque généré ✅</h2>
