@@ -10,10 +10,10 @@ app = Flask(__name__)
 
 # Load TFLite model
 TFLITE_MODEL_PATH = "model/model.tflite"
-#interpreter = tf.lite.Interpreter(model_path=TFLITE_MODEL_PATH)
-#interpreter.allocate_tensors()
-#input_details = interpreter.get_input_details()
-#output_details = interpreter.get_output_details()
+interpreter = tf.lite.Interpreter(model_path=TFLITE_MODEL_PATH)
+interpreter.allocate_tensors()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
 # Cityscapes palette
 CITYSCAPES_PALETTE = [
