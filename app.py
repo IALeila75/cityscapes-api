@@ -104,7 +104,11 @@ def dashboard():
 def download_mask():
 
     mask_path = "static/latest_mask.png"
-    return send_file(mask_path, as_attachment=True) if os.path.exists(mask_path) else "❌ Masque non trouvé", 404
+    if os.path.exists(mask_path):
+        return send_file(mask_path, as_attachment=True)
+    else:
+        return "❌ Aucun masque disponible à télécharger.", 404
+    #return send_file(mask_path, as_attachment=True) if os.path.exists(mask_path) else "❌ Masque non trouvé", 404
 
 if __name__ == '__main__':
      port = int(os.environ.get("PORT", 5000))
