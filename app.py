@@ -8,6 +8,7 @@ import tensorflow as tf
 
 app = Flask(__name__)
 TFLITE_MODEL_PATH = "model/model.tflite"
+os.makedirs("static", exist_ok=True)
 
 # Chargement du modèle TFLite
 interpreter = tf.lite.Interpreter(model_path=TFLITE_MODEL_PATH)
