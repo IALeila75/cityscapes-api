@@ -1,8 +1,9 @@
 # app.py
 import os
 import io
+import time
 import numpy as np
-from flask import Flask, request, send_file, render_template_string
+from flask import Flask, request, send_file, render_template_string, jsonify
 from PIL import Image
 import tensorflow as tf
 
@@ -10,13 +11,16 @@ app = Flask(__name__)
 TFLITE_MODEL_PATH = "model/model.tflite"
 os.makedirs("static", exist_ok=True)
 
-# Chargement du modèle TFLite
-interpreter = tf.lite.Interpreter(model_path=TFLITE_MODEL_PATH)
-interpreter.allocate_tensors()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+# Chargement du modèle avec try/except
+try:
+    interpreter = tf.lite.Interpreter(model_path=TFLITE_MODEL_PATH)
+    interpreter.allocate_tensors()
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+except Exception as e:
+    print(f"[ERREUR] Chargement du modèle échoué : {e}")
+    interpreter = None
 
-# Cityscapes palette
 CITYSCAPES_PALETTE = [
     (128, 64, 128), (244, 35, 232), (70, 70, 70), (102, 102, 156),
     (190, 153, 153), (153, 153, 153), (250, 170, 30), (220, 220, 0),
@@ -26,6 +30,9 @@ CITYSCAPES_PALETTE = [
 ]
 
 def predict_mask_tflite(image, input_size=(128, 256)):
+    if interpreter is None:
+        raise RuntimeError("Modèle non chargé")
+
     image = image.resize(input_size[::-1])
     img_array = np.array(image, dtype=np.float32) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
@@ -65,14 +72,14 @@ def dashboard():
 
     image_file = request.files['image']
     original = Image.open(image_file).convert("RGB")
+
+    start_time = time.time()
     mask = predict_mask_tflite(original)
     mask = mask.resize(original.size)
+    elapsed_time = round(time.time() - start_time, 2)
 
-    # Superposition (blend)
     overlay = Image.blend(original, mask, alpha=0.5)
 
-    # Sauvegarde
-    os.makedirs("static", exist_ok=True)
     mask_path = "static/latest_mask.png"
     overlay_path = "static/latest_overlay.png"
     mask.save(mask_path)
@@ -90,6 +97,7 @@ def dashboard():
     <head><title>Dashboard</title></head>
     <body style="text-align:center;font-family:sans-serif;">
         <h2>Résultat de la prédiction</h2>
+        <p>⏱️ Temps de prédiction : {elapsed_time} secondes</p>
         <div style="display:flex; justify-content:center; gap:20px;">
             <div><h4>Image originale</h4><img src="data:image/png;base64,{encode_image(original)}" width="250"></div>
             <div><h4>Masque prédit</h4><img src="data:image/png;base64,{encode_image(mask)}" width="250"></div>
@@ -101,16 +109,40 @@ def dashboard():
     '''
     return render_template_string(html)
 
+@app.route("/predict", methods=["POST"])
+def predict():
+    if interpreter is None:
+        return jsonify({"error": "Modèle introuvable"}), 500
+
+    if 'image' not in request.files:
+        return jsonify({"error": "Aucune image reçue"}), 400
+
+    try:
+        image = Image.open(request.files['image']).convert("RGB")
+        mask = predict_mask_tflite(image)
+        mask = mask.resize(image.size)
+
+        buffer = io.BytesIO()
+        mask.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        return send_file(buffer, mimetype="image/png")
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/download_mask")
 def download_mask():
-
     mask_path = "static/latest_mask.png"
     if os.path.exists(mask_path):
         return send_file(mask_path, as_attachment=True)
     else:
         return "❌ Aucun masque disponible à télécharger.", 404
-    #return send_file(mask_path, as_attachment=True) if os.path.exists(mask_path) else "❌ Masque non trouvé", 404
+
+@app.route("/debug")
+def debug():
+    return "✅ App Flask en ligne et fonctionne !"
 
 if __name__ == '__main__':
-     port = int(os.environ.get("PORT", 5000))
-     app.run(host="0.0.0.0", port=port)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
